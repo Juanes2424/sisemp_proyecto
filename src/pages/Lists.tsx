@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import { Dialog, PageHeader, Pill, StatusPill } from '../components/ui';
+import { CategoryTag, Dialog, KpiTile, PageHeader, Pill, StatusPill, STATUS_TONE } from '../components/ui';
 import { dateRange, ITEM_STATUS_LABEL, money, quoteTotals } from '../data/logic';
 import { uid, useStore } from '../data/store';
 import type { InventoryItem, Supplier } from '../data/types';
@@ -14,7 +14,13 @@ export function InventoryList() {
   const [q, setQ] = useState('');
   const today = new Date().toISOString().slice(0, 10);
   const needle = q.trim().toLowerCase();
-  const rows = state.inventory.filter(i => !needle || `${i.name} ${i.code} ${i.category}`.toLowerCase().includes(needle));
+  const [status, setStatus] = useState<InventoryItem['status'] | 'sin_stock' | null>(null);
+  const matches = (i: InventoryItem, f: typeof status) => !f || (f === 'sin_stock' ? i.qty === 0 : i.status === f);
+  const count = (f: typeof status) => state.inventory.filter(i => matches(i, f)).length;
+  const toggle = (f: typeof status) => setStatus(status === f ? null : f);
+  const rows = state.inventory
+    .filter(i => matches(i, status))
+    .filter(i => !needle || `${i.name} ${i.code} ${i.category}`.toLowerCase().includes(needle));
 
   const add = () => {
     const id = uid('i');
@@ -28,6 +34,12 @@ export function InventoryList() {
   return (
     <>
       <PageHeader eyebrow="Operación" title="Inventario" actions={<button className="btn btn-p" type="button" onClick={add}><Icon name="plus" />Nuevo ítem</button>} />
+      <div className="kpis" role="group" aria-label="Resumen de bodega">
+        <KpiTile icon="check" tone="green" value={count('disponible')} label="Disponibles" active={status === 'disponible'} onClick={() => toggle('disponible')} />
+        <KpiTile icon="out" tone="amber" value={count('en_set')} label="En set" active={status === 'en_set'} onClick={() => toggle('en_set')} />
+        <KpiTile icon="wrench" tone="blue" value={count('mantenimiento')} label="En mantenimiento" active={status === 'mantenimiento'} onClick={() => toggle('mantenimiento')} />
+        <KpiTile icon="alert" tone="red" value={count('sin_stock')} label="Sin unidades" hint="Cantidad en 0" active={status === 'sin_stock'} onClick={() => toggle('sin_stock')} />
+      </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <div className="search">
           <Icon name="search" style={{ color: '#6E6E76' }} />
@@ -42,11 +54,11 @@ export function InventoryList() {
               {rows.map(i => {
                 const reserved = state.reservations.filter(r => r.itemId === i.id && (r.to || r.from) >= today).reduce((s, r) => s + r.qty, 0);
                 return (
-                  <tr key={i.id}>
+                  <tr key={i.id} className={`acc-${i.qty === 0 ? 'red' : ITEM_TONE[i.status]}`}>
                     <td><Link className="row-link" to={`/inventario/${i.id}`}>{i.name}</Link></td>
                     <td className="mono dim" style={{ fontSize: 13 }}>{i.code}</td>
-                    <td className="dim">{i.category || '—'}</td>
-                    <td className="num mono">{i.qty}</td>
+                    <td><CategoryTag category={i.category} /></td>
+                    <td className="num mono" style={i.qty === 0 ? { color: '#B42318', fontWeight: 600 } : undefined}>{i.qty}</td>
                     <td className="num mono dim">{reserved}</td>
                     <td><Pill tone={ITEM_TONE[i.status]}>{ITEM_STATUS_LABEL[i.status]}</Pill></td>
                     <td>{i.location ? <span className="loc">{i.location}</span> : '—'}</td>
@@ -56,7 +68,7 @@ export function InventoryList() {
             </tbody>
           </table>
         </div>
-        <div className="card-foot"><span>{rows.length} ítems</span></div>
+        <div className="card-foot"><span>{rows.length} de {state.inventory.length} ítems</span></div>
       </section>
     </>
   );
@@ -139,7 +151,7 @@ export function Quotes() {
             <thead><tr><th>Producción</th><th>Rodaje</th><th>Proveedores</th><th>Estado</th><th className="num">Total</th></tr></thead>
             <tbody>
               {rows.map(p => (
-                <tr key={p.id}>
+                <tr key={p.id} className={`acc-${STATUS_TONE[p.status]}`}>
                   <td><Link className="row-link" to={`/proyectos/${p.id}/comparador`}>{p.name}</Link></td>
                   <td className="mono dim" style={{ fontSize: 13 }}>{dateRange(p)}</td>
                   <td className="dim">{p.rfq ? `${p.rfq.supplierIds.length} invitados` : '—'}</td>

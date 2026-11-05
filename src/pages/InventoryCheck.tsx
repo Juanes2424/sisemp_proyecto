@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import { PageHeader, Pill, Stepper } from '../components/ui';
+import { CategoryTag, KpiTile, PageHeader, Pill, Stepper, stepStyle } from '../components/ui';
 import { dateRange, inventoryCheck } from '../data/logic';
 import { uid, useStore } from '../data/store';
 import { NotFound } from './NotFound';
@@ -48,30 +48,39 @@ export function InventoryCheck() {
 
       <Stepper projectId={project.id} current={1} />
 
-      <div className="stats">
-        <div className="card stat"><div className="stat-ic tone-green"><Icon name="check" size={20} /></div><div><b>{n('disponible')}</b><span>Disponibles</span></div></div>
-        <div className="card stat"><div className="stat-ic tone-amber"><Icon name="clock" size={20} /></div><div><b>{n('reservado')}</b><span>Reservado en otro proyecto</span></div></div>
-        <div className={`card stat ${n('faltante') ? 'alert' : ''}`}><div className="stat-ic tone-solid-red"><Icon name="alert" size={20} /></div><div><b>{n('faltante')}</b><span>Faltante</span></div></div>
+      <div className="kpis">
+        <KpiTile icon="check" tone="green" value={n('disponible')} label="Disponibles" hint="Listos para reservar" />
+        <KpiTile icon="clock" tone="amber" value={n('reservado')} label="Comprometidos en otra producción" hint="Se pueden alquilar" />
+        <KpiTile icon="alert" tone="red" value={n('faltante')} label="Faltantes" hint="Se cotizan con proveedores" />
       </div>
 
       <section className="card" aria-label="Materiales requeridos">
         <div className="scroll-x">
-          <table className="t" style={{ minWidth: 820 }}>
+          <table className="t" style={{ minWidth: 960 }}>
             <thead>
               <tr>
                 <th style={{ width: 48 }}><input className="cb" type="checkbox" aria-label="Seleccionar todos" checked={allOn}
                   onChange={() => setSelected(allOn ? new Set() : new Set(rows.map(r => r.item.id)))} /></th>
-                <th>Ítem</th><th>Categoría</th><th className="num">Requerido</th><th className="num">En bodega</th><th>Estado</th><th>Ubicación</th>
+                <th>Ítem</th><th>Categoría</th><th className="num">Requerido</th><th className="num">En bodega</th><th>Disponibilidad</th><th>Estado</th><th>Ubicación</th>
               </tr>
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.item.id} style={r.state === 'faltante' ? { background: '#FFFBFA' } : undefined}>
+                <tr key={r.item.id} className={`acc-${r.state === 'disponible' ? 'green' : r.state === 'reservado' ? 'amber' : 'red'}`}>
                   <td><input className="cb" type="checkbox" checked={selected.has(r.item.id)} onChange={() => toggle(r.item.id)} aria-label={`Seleccionar ${r.item.name}`} /></td>
                   <td><Link className="row-link" to={`/inventario/${r.item.id}`}>{r.item.name}</Link></td>
-                  <td className="dim">{r.item.category}</td>
+                  <td><CategoryTag category={r.item.category} /></td>
                   <td className="num mono">{r.required}</td>
                   <td className="num mono" style={r.state === 'faltante' ? { color: '#B42318', fontWeight: 500 } : undefined}>{r.item.qty}</td>
+                  <td>
+                    <span className="meter" title={`${Math.min(r.free, r.required)} de ${r.required} cubiertos con bodega`}>
+                      <span className="meter-bar" aria-hidden="true">
+                        {Math.min(r.free, r.required) > 0 && <i className="ok" style={{ flex: Math.min(r.free, r.required) }} />}
+                        {r.shortage > 0 && <i className={r.state === 'reservado' ? 'gap-amber' : 'gap-red'} style={{ flex: r.shortage }} />}
+                      </span>
+                      <span>{Math.min(r.free, r.required)} de {r.required}</span>
+                    </span>
+                  </td>
                   <td>
                     {r.state === 'disponible' && (r.reservedHere >= r.required
                       ? <Pill tone="green">Reservado para este proyecto</Pill>
@@ -82,7 +91,7 @@ export function InventoryCheck() {
                   <td><span className="loc">{r.item.location}</span></td>
                 </tr>
               ))}
-              {rows.length === 0 && <tr><td colSpan={7} className="empty">El desglose no tiene materiales todavía.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={8} className="empty">El desglose no tiene materiales todavía.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -94,8 +103,8 @@ export function InventoryCheck() {
               Reservar seleccionados ({reservable.length})
             </button>
             {missing.length > 0
-              ? <button className="btn btn-p" type="button" onClick={quoteMissing}>Cotizar faltantes <Icon name="next" /></button>
-              : <Link className="btn btn-p" to={`/proyectos/${id}/comparador`}>Ir al resumen <Icon name="next" /></Link>}
+              ? <button className="btn btn-step" style={stepStyle(2)} type="button" onClick={quoteMissing}>Cotizar faltantes <Icon name="next" /></button>
+              : <Link className="btn btn-step" style={stepStyle(3)} to={`/proyectos/${id}/comparador`}>Ir al resumen <Icon name="next" /></Link>}
           </div>
         </div>
       </section>

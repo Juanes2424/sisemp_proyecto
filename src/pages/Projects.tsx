@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Dots, Icon } from '../components/Icon';
-import { PageHeader, Pill, StatusPill } from '../components/ui';
-import { dateRange, inventoryCheck, STATUS_LABEL } from '../data/logic';
+import { KpiTile, PageHeader, Pill, STATUS_TONE, StatusPill, STEPS, stepStyle } from '../components/ui';
+import { dateRange, inventoryCheck, nextStep, STATUS_LABEL } from '../data/logic';
 import { uid, useStore } from '../data/store';
 import type { ProjectStatus } from '../data/types';
 
+type Filter = ProjectStatus | 'todos' | 'faltantes';
 const FILTERS: (ProjectStatus | 'todos')[] = ['todos', 'nuevo', 'cotizacion', 'enviado', 'aprobado'];
 
 export function Projects() {
   const { state, update, toast } = useStore();
   const nav = useNavigate();
-  const [filter, setFilter] = useState<ProjectStatus | 'todos'>('todos');
+  const [filter, setFilter] = useState<Filter>('todos');
   const [q, setQ] = useState('');
   const [menu, setMenu] = useState<string | null>(null);
   const isManager = state.user.role === 'gerencia';
@@ -23,10 +24,15 @@ export function Projects() {
     return () => window.removeEventListener('click', close);
   }, [menu]);
 
-  const count = (f: ProjectStatus | 'todos') => state.projects.filter(p => f === 'todos' || p.status === f).length;
+  const missingOf = (p: (typeof state.projects)[number]) =>
+    p.effects.length ? inventoryCheck(state, p).filter(r => r.shortage > 0).length : null;
+  const matches = (p: (typeof state.projects)[number], f: Filter) =>
+    f === 'todos' || (f === 'faltantes' ? (missingOf(p) ?? 0) > 0 && p.status !== 'aprobado' : p.status === f);
+  const count = (f: Filter) => state.projects.filter(p => matches(p, f)).length;
+  const toggleFilter = (f: Filter) => setFilter(filter === f ? 'todos' : f);
   const needle = q.trim().toLowerCase();
   const rows = state.projects
-    .filter(p => filter === 'todos' || p.status === filter)
+    .filter(p => matches(p, filter))
     .filter(p => !needle || `${p.name} ${p.client} ${p.location}`.toLowerCase().includes(needle));
 
   const createProject = () => {
@@ -59,6 +65,17 @@ export function Projects() {
         </button>
       } />
 
+      <div className="kpis" role="group" aria-label="Resumen de proyectos">
+        <KpiTile icon="clock" tone="blue" value={count('cotizacion')} label="En cotización"
+          hint="Buscando material y precios" active={filter === 'cotizacion'} onClick={() => toggleFilter('cotizacion')} />
+        <KpiTile icon="send" tone="amber" value={count('enviado')} label="Esperando a gerencia"
+          hint={isManager ? 'Requieren tu aprobación' : 'Enviados para aprobación'} active={filter === 'enviado'} onClick={() => toggleFilter('enviado')} />
+        <KpiTile icon="check" tone="green" value={count('aprobado')} label="Aprobados"
+          hint="Material reservado" active={filter === 'aprobado'} onClick={() => toggleFilter('aprobado')} />
+        <KpiTile icon="alert" tone="red" value={count('faltantes')} label="Con material faltante"
+          hint="Hay que conseguir equipos" active={filter === 'faltantes'} onClick={() => toggleFilter('faltantes')} />
+      </div>
+
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
         <div className="tabs" role="tablist" aria-label="Filtrar por estado">
           {FILTERS.map(f => (
@@ -76,24 +93,41 @@ export function Projects() {
 
       <section className="card">
         <div className="scroll-x">
-          <table className="t" style={{ minWidth: 820 }}>
+          <table className="t" style={{ minWidth: 900 }}>
             <thead>
-              <tr><th>Producción</th><th>Cliente</th><th>Rodaje</th><th>Locación</th><th>Estado</th><th>Faltantes</th><th><span className="sr-only">Acciones</span></th></tr>
+              <tr><th>Producción</th><th>Rodaje</th><th>Estado</th><th>Faltantes</th><th>Avance</th><th>Siguiente paso</th><th><span className="sr-only">Acciones</span></th></tr>
             </thead>
             <tbody>
               {rows.map(p => {
-                const missing = p.effects.length ? inventoryCheck(state, p).filter(r => r.shortage > 0).length : null;
+                const missing = missingOf(p);
+                const next = nextStep(state, p, isManager);
                 return (
-                  <tr key={p.id}>
-                    <td><Link className="row-link" to={`/proyectos/${p.id}`}>{p.name}</Link></td>
-                    <td className="dim">{p.client || '—'}</td>
+                  <tr key={p.id} className={`acc-${STATUS_TONE[p.status]}`}>
+                    <td>
+                      <Link className="row-link" to={`/proyectos/${p.id}`}>{p.name}</Link>
+                      <div style={{ fontSize: 12, color: '#6E6E76', marginTop: 2 }}>{p.client || 'Sin cliente'} · {p.location || 'Sin locación'}</div>
+                    </td>
                     <td className="dim mono" style={{ fontSize: 13 }}>{dateRange(p)}</td>
-                    <td>{p.location || '—'}</td>
                     <td><StatusPill status={p.status} /></td>
                     <td>
                       {missing === null ? <span style={{ color: '#8B8B94' }}>—</span>
                         : missing > 0 ? <Pill tone="red" dot={false}>{missing} faltante{missing > 1 ? 's' : ''}</Pill>
-                          : <span className="dim">0</span>}
+                          : <Pill tone="green" dot={false}>Completo</Pill>}
+                    </td>
+                    <td>
+                      <span className="prog" role="img" aria-label={`Paso ${Math.min(next.step + 1, 4)} de 4`}>
+                        {STEPS.map((s, i) => (
+                          <i key={s.label} title={s.label}
+                            style={i < next.step ? { background: s.c } : i === next.step ? { background: s.c, opacity: 0.4 } : undefined} />
+                        ))}
+                      </span>
+                    </td>
+                    <td>
+                      {next.step === 4
+                        ? <Link className="step-chip done" to={`/proyectos/${p.id}${next.path}`}><Icon name="check" size={14} />{next.label}</Link>
+                        : next.waiting
+                          ? <span className="step-chip wait"><Icon name="clock" size={14} />{next.label}</span>
+                          : <Link className="step-chip" style={stepStyle(next.step)} to={`/proyectos/${p.id}${next.path}`}>{next.label}<Icon name="next" size={14} /></Link>}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div className="menu-wrap">

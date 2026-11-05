@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import { PageHeader, StatusPill, Stepper } from '../components/ui';
+import { EffectTag, PageHeader, StatusPill, Stepper, stepStyle } from '../components/ui';
 import { EFFECT_MATERIALS, EFFECT_TYPES } from '../data/seed';
 import { uid, useStore } from '../data/store';
 import type { Project } from '../data/types';
@@ -45,8 +45,8 @@ export function Desglose() {
         actions={<>
           <button className="btn btn-s" type="button" onClick={() => toast('Cambios guardados')}>Guardar</button>
           {project.effects.length > 0
-            ? <Link className="btn btn-p" to={`/proyectos/${id}/inventario`}>Verificar inventario <Icon name="next" /></Link>
-            : <button className="btn btn-p" type="button" disabled>Verificar inventario <Icon name="next" /></button>}
+            ? <Link className="btn btn-step" style={stepStyle(1)} to={`/proyectos/${id}/inventario`}>Verificar inventario <Icon name="next" /></Link>
+            : <button className="btn btn-step" style={stepStyle(1)} type="button" disabled>Verificar inventario <Icon name="next" /></button>}
         </>} />
 
       <Stepper projectId={project.id} current={0} />
@@ -91,7 +91,7 @@ export function Desglose() {
                 {sorted.map(e => (
                   <tr key={e.id}>
                     <td><span className="scene">{e.scene}</span></td>
-                    <td>{e.effect}</td>
+                    <td><EffectTag effect={e.effect} showDept /></td>
                     <td>{itemName(e.itemId)}</td>
                     <td><input className="in mono" type="number" min={0} aria-label={`Cantidad de ${itemName(e.itemId)}`} value={e.qty}
                       onChange={ev => setQty(e.id, Number(ev.target.value))} style={{ height: 34, width: 88 }} /></td>

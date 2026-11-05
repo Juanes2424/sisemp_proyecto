@@ -1,11 +1,20 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import { Dialog, MoneyInput, PageHeader, StatusPill, Stepper } from '../components/ui';
-import { inventoryCheck, money, quoteTotals } from '../data/logic';
+import { Banner, Dialog, MoneyInput, PageHeader, StatusPill, Stepper, stepStyle } from '../components/ui';
+import { inventoryCheck, money, quoteTotals, type Totals } from '../data/logic';
 import { uid, useStore } from '../data/store';
 import type { Offer, Project } from '../data/types';
 import { NotFound } from './NotFound';
+
+/** Cost components of the quote, in fixed order and color (validated categorical palette). */
+const MIX: { key: keyof Totals; label: string; color: string }[] = [
+  { key: 'inventory', label: 'Inventario propio', color: '#2a78d6' },
+  { key: 'suppliers', label: 'Proveedores', color: '#eb6834' },
+  { key: 'personal', label: 'Personal', color: '#1baf7a' },
+  { key: 'polizas', label: 'Pólizas y ARL', color: '#eda100' },
+  { key: 'margin', label: 'Margen', color: '#e87ba4' },
+];
 
 interface Draft { supplierId: string; itemId: string; price: number; leadDays: number; available: boolean }
 
@@ -24,6 +33,15 @@ export function Comparador() {
   const itemName = (iid: string) => state.inventory.find(i => i.id === iid)?.name ?? iid;
   const totals = quoteTotals(state, project);
   const locked = project.status === 'aprobado';
+  const pct = (n: number) => (totals.total > 0 ? Math.round((n / totals.total) * 100) : 0);
+  const sw = (key: keyof Totals) => <span className="sw-dot" style={{ background: MIX.find(m => m.key === key)!.color }} />;
+
+  /** Cheapest price and shortest lead time among available offers for an item (only when there is a choice). */
+  const bestOf = (itemId: string) => {
+    const avail = suppliers.map(s => offerOf(s.id, itemId)).filter((o): o is Offer => !!o && o.available);
+    if (avail.length < 2) return { price: -1, lead: -1 };
+    return { price: Math.min(...avail.map(o => o.price)), lead: Math.min(...avail.map(o => o.leadDays)) };
+  };
 
   const mutate = (fn: (p: Project) => void) => update(s => fn(s.projects.find(x => x.id === id)!));
 
@@ -69,6 +87,12 @@ export function Comparador() {
         title="Comparador y resumen" badge={<StatusPill status={project.status} />} />
       <Stepper projectId={project.id} current={3} />
 
+      {project.status === 'enviado' && (isManager
+        ? <Banner tone="amber" icon="bolt" title="Esta cotización espera tu aprobación">Revisa las ofertas y el resumen, y usa Aprobar o Rechazar al final del panel derecho.</Banner>
+        : <Banner tone="blue" icon="clock" title="Enviada a gerencia">Gerencia revisará la cotización. Te avisaremos cuando la apruebe o la rechace.</Banner>)}
+      {project.status === 'aprobado' && <Banner tone="green" icon="check" title="Cotización aprobada">El material de bodega quedó reservado para las fechas de rodaje y la orden de compra está lista para exportar a Siigo.</Banner>}
+      {project.status === 'rechazado' && <Banner tone="red" icon="x" title="Gerencia rechazó la cotización">Ajusta proveedores, personal o margen y vuelve a enviarla.</Banner>}
+
       <div className="split">
         <section className="card" aria-labelledby="cmp" style={{ flex: '999 1 560px', minWidth: 0 }}>
           <div className="card-head" style={{ padding: '18px 20px' }}>
@@ -82,10 +106,10 @@ export function Comparador() {
             </div>
           ) : (
             <div className="scroll-x">
-              <table className="t" style={{ minWidth: 200 + suppliers.length * 220 }}>
+              <table className="t" style={{ minWidth: 180 + suppliers.length * 180 }}>
                 <thead><tr><th style={{ paddingLeft: 20 }}>Ítem</th>{suppliers.map(s => <th key={s.id}>{s.name}</th>)}</tr></thead>
                 <tbody>
-                  {rfq.lines.map(line => (
+                  {rfq.lines.map(line => { const best = bestOf(line.itemId); return (
                     <tr key={line.itemId}>
                       <td style={{ paddingLeft: 20 }}>
                         <div style={{ fontWeight: 500 }}>{itemName(line.itemId)}</div>
@@ -109,14 +133,20 @@ export function Comparador() {
                         );
                         return (
                           <td key={s.id}>
-                            <label className={`offer ${chosen ? 'on' : ''} ${!o.available ? 'off' : ''}`}>
+                            <label className={`offer ${chosen ? 'on' : ''} ${!o.available ? 'off' : ''} ${o.available && o.price === best.price ? 'best' : ''}`}>
                               <input className="rd" type="radio" name={line.itemId} checked={chosen} disabled={!o.available || locked}
                                 onChange={() => mutate(p => { p.choices[line.itemId] = s.id; })} />
                               <span className="offer-body">
-                                <span className="mono" style={{ fontWeight: 500 }}>{money(o.price)}</span>
+                                <span className="mono" style={{ fontWeight: 500, color: o.available ? undefined : '#8B8B94' }}>{o.available ? money(o.price) : '—'}</span>
                                 {o.available
                                   ? <span style={{ fontSize: 12, color: '#146C3A', display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ background: '#22A05A' }} />Disponible · {o.leadDays} día{o.leadDays === 1 ? '' : 's'}</span>
-                                  : <span style={{ fontSize: 12, color: '#B42318' }}>No disponible</span>}
+                                  : <span style={{ fontSize: 12, color: '#B42318', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="x" size={12} />No disponible</span>}
+                                {o.available && (o.price === best.price || o.leadDays === best.lead) && (
+                                  <span className="badges">
+                                    {o.price === best.price && <span className="badge badge-price"><Icon name="star" size={11} />Mejor precio</span>}
+                                    {o.leadDays === best.lead && <span className="badge badge-fast"><Icon name="bolt" size={11} />Entrega más rápida</span>}
+                                  </span>
+                                )}
                                 {!locked && <button className="link-btn no-print" type="button" onClick={e => { e.preventDefault(); openDraft(); }}>Editar</button>}
                               </span>
                             </label>
@@ -124,7 +154,7 @@ export function Comparador() {
                         );
                       })}
                     </tr>
-                  ))}
+                  ); })}
                 </tbody>
               </table>
             </div>
@@ -133,13 +163,13 @@ export function Comparador() {
 
         <aside className="card card-pad" aria-labelledby="res" style={{ flex: '1 1 340px', gap: 4 }}>
           <h2 id="res" style={{ marginBottom: 8 }}>Resumen</h2>
-          <div className="sum-row"><span>Inventario propio</span><span className="mono">{money(totals.inventory)}</span></div>
-          <div className="sum-row"><span>Proveedores</span><span className="mono">{money(totals.suppliers)}</span></div>
-          <div className="sum-row"><label htmlFor="per">Personal <span style={{ color: '#6E6E76' }}>(dobles, riggers, FX)</span></label>
+          <div className="sum-row"><span>{sw('inventory')}Inventario propio<span className="pct">{pct(totals.inventory)}%</span></span><span className="mono">{money(totals.inventory)}</span></div>
+          <div className="sum-row"><span>{sw('suppliers')}Proveedores<span className="pct">{pct(totals.suppliers)}%</span></span><span className="mono">{money(totals.suppliers)}</span></div>
+          <div className="sum-row"><label htmlFor="per">{sw('personal')}Personal <span style={{ color: '#6E6E76' }}>(dobles, riggers, FX)</span></label>
             <div className="money-in"><MoneyInput id="per" value={project.costs.personal} onChange={v => mutate(p => { p.costs.personal = v; })} /></div></div>
-          <div className="sum-row"><label htmlFor="pol">Pólizas y ARL</label>
+          <div className="sum-row"><label htmlFor="pol">{sw('polizas')}Pólizas y ARL</label>
             <div className="money-in"><MoneyInput id="pol" value={project.costs.polizas} onChange={v => mutate(p => { p.costs.polizas = v; })} /></div></div>
-          <div className="sum-row"><label htmlFor="mg">Margen</label>
+          <div className="sum-row"><label htmlFor="mg">{sw('margin')}Margen <span className="mono" style={{ color: '#6E6E76' }}>({money(totals.margin)})</span></label>
             <div style={{ position: 'relative', width: 96 }}>
               <input className="in mono" id="mg" type="number" min={0} max={100} value={project.costs.margin || ''} placeholder="0"
                 onChange={e => mutate(p => { p.costs.margin = Math.max(0, Number(e.target.value)); })}
@@ -148,12 +178,19 @@ export function Comparador() {
             </div>
           </div>
           <div style={{ height: 1, background: '#E7E5E1', margin: '10px 0 6px' }} />
+          {totals.total > 0 && (
+            <div className="mix" role="img" aria-label={`Composición del total: ${MIX.map(m => `${m.label} ${pct(totals[m.key])}%`).join(', ')}`}>
+              {MIX.filter(m => totals[m.key] > 0).map(m => (
+                <i key={m.key} style={{ flex: totals[m.key], background: m.color }} title={`${m.label}: ${money(totals[m.key])} (${pct(totals[m.key])}%)`} />
+              ))}
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, padding: '6px 0 14px' }}>
             <span style={{ fontSize: 15, fontWeight: 600 }}>Total</span>
             <span className="mono" style={{ fontSize: 26, fontWeight: 500, letterSpacing: '-0.02em' }}>{money(totals.total)}</span>
           </div>
           <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button className="btn btn-p" type="button" style={{ width: '100%', height: 44 }} onClick={sendToManagement}
+            <button className="btn btn-step" type="button" style={{ ...stepStyle(3), width: '100%', height: 44 }} onClick={sendToManagement}
               disabled={project.status === 'enviado' || locked}>
               <Icon name="send" />{project.status === 'enviado' ? 'Enviado a gerencia' : 'Enviar a gerencia'}
             </button>

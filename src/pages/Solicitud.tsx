@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import { PageHeader, Stepper } from '../components/ui';
+import { PageHeader, Stepper, stepStyle } from '../components/ui';
 import { inventoryCheck } from '../data/logic';
 import { useStore } from '../data/store';
 import { NotFound } from './NotFound';
@@ -90,7 +90,7 @@ export function Solicitud() {
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link className="btn btn-s" to={`/proyectos/${id}/inventario`}>Cancelar</Link>
-          <button className="btn btn-p" type="button" disabled={!canSend} onClick={send}>
+          <button className="btn btn-step" style={stepStyle(3)} type="button" disabled={!canSend} onClick={send}>
             <Icon name="send" />{prev ? 'Reenviar' : 'Enviar'} a {suppliers.size} proveedor{suppliers.size === 1 ? '' : 'es'}
           </button>
         </div>

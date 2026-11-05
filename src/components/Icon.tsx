@@ -27,6 +27,12 @@ const P: Record<string, ReactNode> = {
   in: <path d="M17 7L7 17M15 17H7V9" />,
   wrench: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L4 16.8V20h3.2l5.3-5.3a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.3-.6-.6-2.3z" />,
   bookmark: <path d="M6 3h12v18l-6-4-6 4z" />,
+  burst: <path d="M12 2l2 6 6-3-3 6 5 2-5 2 3 6-6-3-2 6-2-6-6 3 3-6-5-2 5-2-3-6 6 3z" />,
+  fall: <><circle cx="14" cy="4" r="2" /><path d="M13 7l-3 5 4 2-2 6M10 12l-4-1M14 14l4-2" /><path d="M4 21h16" /></>,
+  cloud: <path d="M7 18a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6-1.5A4.5 4.5 0 0 1 17.5 18z" />,
+  star: <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />,
+  bolt: <path d="M13 2L4 14h7l-1 8 9-12h-7z" />,
+  x: <path d="M6 6l12 12M18 6L6 18" />,
 };
 
 export type IconName = keyof typeof P;

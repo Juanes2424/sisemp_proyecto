@@ -20,19 +20,19 @@ export const EFFECT_MATERIALS: Record<string, { itemId: string; qty: number }[]>
 
 export const EFFECT_TYPES = Object.keys(EFFECT_MATERIALS);
 
-export const SEED_VERSION = 1;
+export const SEED_VERSION = 2;
 
 export function seedState(): State {
   return {
     version: SEED_VERSION,
     user: { name: 'Stunt manager', initials: 'SM', role: 'produccion' },
     inventory: [
-      { id: 'pyro', code: 'FX-001', name: 'Cargas pirotécnicas', category: 'Efectos', qty: 10, location: 'A-1', status: 'disponible', dailyRate: 0 },
-      { id: 'smoke', code: 'FX-004', name: 'Máquina de humo', category: 'Efectos', qty: 3, location: 'A-4', status: 'disponible', dailyRate: 0 },
-      { id: 'gel', code: 'FX-007', name: 'Gel ignífugo', category: 'Efectos', qty: 6, location: 'A-2', status: 'disponible', dailyRate: 0 },
-      { id: 'ext', code: 'SG-002', name: 'Extintores', category: 'Seguridad', qty: 4, location: 'C-2', status: 'disponible', dailyRate: 0 },
-      { id: 'harness', code: 'RG-003', name: 'Arnés + descensor', category: 'Stunts / rigging', qty: 0, location: 'B-3', status: 'mantenimiento', dailyRate: 0 },
-      { id: 'mat', code: 'RG-010', name: 'Colchoneta de caída', category: 'Stunts / rigging', qty: 2, location: 'B-1', status: 'disponible', dailyRate: 0 },
+      { id: 'pyro', code: 'FX-001', name: 'Cargas pirotécnicas', category: 'Efectos', qty: 10, location: 'A-1', status: 'disponible', dailyRate: 80000 },
+      { id: 'smoke', code: 'FX-004', name: 'Máquina de humo', category: 'Efectos', qty: 3, location: 'A-4', status: 'disponible', dailyRate: 150000 },
+      { id: 'gel', code: 'FX-007', name: 'Gel ignífugo', category: 'Efectos', qty: 6, location: 'A-2', status: 'disponible', dailyRate: 40000 },
+      { id: 'ext', code: 'SG-002', name: 'Extintores', category: 'Seguridad', qty: 4, location: 'C-2', status: 'disponible', dailyRate: 25000 },
+      { id: 'harness', code: 'RG-003', name: 'Arnés + descensor', category: 'Stunts / rigging', qty: 0, location: 'B-3', status: 'mantenimiento', dailyRate: 120000 },
+      { id: 'mat', code: 'RG-010', name: 'Colchoneta de caída', category: 'Stunts / rigging', qty: 2, location: 'B-1', status: 'disponible', dailyRate: 90000 },
     ],
     projects: [
       {
@@ -56,7 +56,11 @@ export function seedState(): State {
           { id: 'e7', scene: '9', effect: 'Caída (stunt)', itemId: 'harness', qty: 2 },
           { id: 'e8', scene: '9', effect: 'Caída (stunt)', itemId: 'mat', qty: 3 },
         ],
-        choices: {}, costs: { personal: 0, polizas: 0, margin: 0 }, createdAt: '2026-10-28T12:00:00Z',
+        rfq: {
+          lines: [{ itemId: 'harness', qty: 2, rental: false }, { itemId: 'mat', qty: 1, rental: false }],
+          specs: 'Entrega en set, Cartagena.', supplierIds: ['s-soac', 's-b', 's-c'], deadline: '2026-11-06', sentAt: '2026-10-30T12:00:00Z',
+        },
+        choices: { harness: 's-b', mat: 's-soac' }, costs: { personal: 8_000_000, polizas: 1_500_000, margin: 20 }, createdAt: '2026-10-28T12:00:00Z',
       },
       {
         id: 'p-c', name: 'Comercial [Cliente C]', client: '[Agencia]', location: 'Medellín',
@@ -85,6 +89,12 @@ export function seedState(): State {
       { id: 's-b', name: '[Proveedor B]', initials: 'PB', category: 'Seguridad y rigging', channel: 'portal', email: '' },
       { id: 's-c', name: '[Proveedor C]', initials: 'PC', category: 'Seguridad y rigging', channel: 'email', email: '' },
     ],
-    offers: [],
+    offers: [
+      { id: 'o1', projectId: 'p-b', supplierId: 's-soac', itemId: 'harness', price: 1_200_000, leadDays: 2, available: true },
+      { id: 'o2', projectId: 'p-b', supplierId: 's-b', itemId: 'harness', price: 980_000, leadDays: 5, available: true },
+      { id: 'o3', projectId: 'p-b', supplierId: 's-soac', itemId: 'mat', price: 450_000, leadDays: 2, available: true },
+      { id: 'o4', projectId: 'p-b', supplierId: 's-b', itemId: 'mat', price: 520_000, leadDays: 1, available: true },
+      { id: 'o5', projectId: 'p-b', supplierId: 's-c', itemId: 'mat', price: 0, leadDays: 0, available: false },
+    ],
   };
 }

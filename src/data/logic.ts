@@ -92,6 +92,32 @@ export function inventoryCheck(state: State, project: Project): CheckRow[] {
   return rows;
 }
 
+export interface NextStep {
+  /** 0-3: flow step to work on; 4: flow finished */
+  step: number;
+  label: string;
+  /** Route suffix under /proyectos/:id */
+  path: string;
+  /** Nothing for this role to do yet */
+  waiting?: boolean;
+}
+
+/** What the project needs next, so the list can point the user to it. */
+export function nextStep(state: State, p: Project, isManager: boolean): NextStep {
+  if (p.status === 'aprobado') return { step: 4, label: 'Aprobado · ver resumen', path: '/comparador' };
+  if (p.status === 'rechazado') return { step: 3, label: 'Ajustar y reenviar', path: '/comparador' };
+  if (p.status === 'enviado') {
+    return isManager
+      ? { step: 3, label: 'Revisar y aprobar', path: '/comparador' }
+      : { step: 3, label: 'Esperando a gerencia', path: '/comparador', waiting: true };
+  }
+  if (p.effects.length === 0 || !p.start) return { step: 0, label: 'Completar desglose', path: '' };
+  if (p.status === 'nuevo') return { step: 1, label: 'Verificar inventario', path: '/inventario' };
+  const missing = inventoryCheck(state, p).some(r => r.shortage > 0);
+  if (!p.rfq && missing) return { step: 2, label: 'Pedir a proveedores', path: '/solicitud' };
+  return { step: 3, label: 'Comparar ofertas', path: '/comparador' };
+}
+
 export interface Totals {
   inventory: number;
   suppliers: number;
